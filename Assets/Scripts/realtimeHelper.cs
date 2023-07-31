@@ -37,6 +37,8 @@ public class realtimeHelper : MonoBehaviour
         //Instantiate a New Player
         GameObject newPlayer = Realtime.Instantiate(playerPrefabName, Realtime.InstantiateOptions.defaults);
         RequestOwnerShip(newPlayer);
+
+        AllRequestOwnerShip();
     }
 
     private void RequestOwnerShip(GameObject o)
@@ -48,11 +50,24 @@ public class realtimeHelper : MonoBehaviour
             rtTransform.RequestOwnership();
 
         for(int c = 0; c < o.transform.childCount; c++)
-        {
             RequestOwnerShip(o.transform.GetChild(c).gameObject);
-        }
 
         return;
+    }
+
+    private void AllRequestOwnerShip()
+    {
+        var rViews = FindObjectsByType<RealtimeView>(FindObjectsSortMode.None);
+        var rTransforms = FindObjectsByType<RealtimeTransform>(FindObjectsSortMode.None);
+
+        foreach (RealtimeView v in rViews)
+        {
+            v.RequestOwnership();
+        }
+        foreach(RealtimeTransform t in rTransforms)
+        {
+            t.RequestOwnership();
+        }
     }
 
     //Generate Random String
