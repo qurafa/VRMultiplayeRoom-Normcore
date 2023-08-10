@@ -25,5 +25,11 @@ public class RequestOwnershipNormcore : MonoBehaviour
         m_RealtimeTransform.RequestOwnership();
     }
 
+    private void OnCollisionEnter(Collision collision)
+    {
+        m_RealtimeView.RequestOwnership();
+        m_RealtimeTransform.RequestOwnership();
+    }
+
     private void OnDisable() => m_GrabInteractable.selectEntered.RemoveListener(RequestOwnership);
 }

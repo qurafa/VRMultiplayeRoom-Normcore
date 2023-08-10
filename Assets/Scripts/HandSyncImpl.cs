@@ -1,9 +1,11 @@
 using Normal.Realtime;
 using System.Collections.Generic;
 using Unity.XR.CoreUtils;
+using UnityEditor.XR.LegacyInputHelpers;
 using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.Hands;
+using static UnityEngine.UI.Image;
 
 public class HandSyncImpl : MonoBehaviour
 {
@@ -32,6 +34,8 @@ public class HandSyncImpl : MonoBehaviour
     private bool _handTrackingAcquired = false;
     private bool _controllerTrackingAcquired = false;
 
+    private XROrigin origin;
+    private Transform cameraOffset;
     private XRHand hand;
     private UnityEngine.XR.InputDevice controllerDevice;
     private bool cDAssigned = false;
@@ -39,9 +43,14 @@ public class HandSyncImpl : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        origin = FindObjectOfType<XROrigin>();
+        cameraOffset = origin.gameObject.transform.GetChild(0);
         _rtView = GetComponent<RealtimeView>();
         _handSync = GetComponent<HandSync>();
-        
+
+        _mySkinMeshRendererHT.enabled= false;
+        _mySkinMeshRendererC.enabled= false;
+
         AssignJoints(transform.GetChild(0));//assigning the joints by giving the root as the wrist
         _jointsAssigned = true;
 
@@ -169,8 +178,6 @@ public class HandSyncImpl : MonoBehaviour
 
     private void AssignHandOrigin()
     {
-        XROrigin origin = FindObjectOfType<XROrigin>();
-
         switch (_handedness)
         {
             case Handedness.Left:
@@ -259,7 +266,7 @@ public class HandSyncImpl : MonoBehaviour
 
         //DONT SEND ANYTHING TO NORMCORE IF THE REAALTIME VIEW IS NOT LOCALLY OWNED
         if (_rtView != null)
-            if(!_rtView.isOwnedLocallyInHierarchy)
+            if (!_rtView.isOwnedLocallySelf)
                 return;
 
         //initializing data to send
@@ -270,9 +277,14 @@ public class HandSyncImpl : MonoBehaviour
             dataToSend += "1|";
             for (int j = 0; j < _joints.Length; j++)
             {
-                if (!hand.GetJoint((XRHandJointID)(j + 1)).TryGetPose(out Pose jointPose))
+                if (!hand.GetJoint((XRHandJointID)(j + 1)).TryGetPose(out Pose jp))
                     return;
-
+                
+                //convertting to the global unity space from the local xrorigin space
+                //var xrOriginPose = new Pose(origin.Origin.transform.position, origin.Origin.transform.rotation);
+                var cameraOffsetPose = new Pose(cameraOffset.position, cameraOffset.rotation);
+                Pose jointPose = jp.GetTransformedBy(cameraOffsetPose);
+                
                 dataToSend += $"{jointPose.position.x}|{jointPose.position.y}|{jointPose.position.z}|{jointPose.rotation.eulerAngles.x}|{jointPose.rotation.eulerAngles.y}|{jointPose.rotation.eulerAngles.z}|";
                 /*dataToSend += _joints[j].localPosition.x + "|"
                     + _joints[j].localPosition.y + "|"
@@ -303,7 +315,7 @@ public class HandSyncImpl : MonoBehaviour
         {
             dataToSend += "0|";
         }
-        Debug.Log("Sending " + dataToSend);
+        //Debug.Log("Sending " + dataToSend);
         _handSync.SetHandData(dataToSend);
     }
 
@@ -316,6 +328,7 @@ public class HandSyncImpl : MonoBehaviour
         if (_rtView != null)
             if (_rtView.isOwnedLocallySelf)
                 return;
+                
                 
         if(netHandData == null || netHandData == "")
             return;
@@ -336,9 +349,11 @@ public class HandSyncImpl : MonoBehaviour
 
             for (int j = 0; j < _joints.Length; j++)
             {
+                Pose xrOriginPose = new Pose(origin.transform.position, origin.transform.rotation);
+                //jointPose.GetTransformedBy(xrOriginPose);
 
+                //Debug.Log("Updating Joints " + netHandData + " ownerID " + _rtView.ownerIDSelf);
                 int jTmp = j * 6;
-                _joints[j].SetLocalPose(new Pose());
                 _joints[j].position =
                     new Vector3(
                     float.Parse(netHandDataArr[jTmp + 1]),
@@ -353,7 +368,7 @@ public class HandSyncImpl : MonoBehaviour
         }
         else if(netHandDataArr[0] == "2")
         {
-            Debug.Log("Updating Joints " + netHandData + " ownerID " + _rtView.ownerIDSelf);
+            //Debug.Log("Updating Controllers " + netHandData + " ownerID " + _rtView.ownerIDSelf);
             _mySkinMeshRendererHT.enabled = false;
             _mySkinMeshRendererC.enabled = true;
 
