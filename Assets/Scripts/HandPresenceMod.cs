@@ -8,19 +8,10 @@ using UnityEngine.XR.Interaction.Toolkit.Samples.Hands;
 [RequireComponent(typeof(HandsAndControllersManager))]    
 public class HandPresenceMod : MonoBehaviour
 {
-    /*[SerializeField]
-    private Transform leftHand;
-    [SerializeField]
-    private Transform rightHand;*/
     [SerializeField]
     private Animator leftHandAnimator;
     [SerializeField]
     private Animator rightHandAnimator;
-
-    //private Transform leftHandOrigin;
-    //private Transform rightHandOrigin;
-
-    //HandsAndControllersManager hCManager;
 
     // Start is called before the first frame update
     void Start()
