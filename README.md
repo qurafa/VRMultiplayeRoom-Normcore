@@ -6,7 +6,7 @@ You may view a demo here: https://youtu.be/tkgfB3GHwtk
 
 ![UserPlaying](https://github.com/qurafa/VRMultiplayeRoom-Normcore/assets/57468292/a54d67a5-3f64-4151-8f47-22df952f16fe)
 
-A multiplayer Virtual Reality shape sorting cube game, built using Unity3D and the XR Interaction Tooklit, but primarily tested on Meta Quest 2 headsets
+A multiplayer Virtual Reality shape sorting cube game, built using Unity3D and the XR Interaction Tooklit, primarily tested on Meta Quest 2 headsets
 
 Supporting Controller and Hand tracking interactions.
 
