@@ -10,35 +10,78 @@ Script Description : Helper for Normcore Realtime Component
 using UnityEngine;
 using Normal.Realtime;
 using System;
-using UnityEngine.UIElements;
-using Unity.XR.CoreUtils;
+using System.Collections.Generic;
+using UnityEngine.XR;
 
 public class realtimeHelper : MonoBehaviour
 {
-    private Realtime _Realtime;
+
+    [SerializeField]
+    private GameObject _localPlayer;
     [SerializeField]
     private string playerPrefabName;
     [SerializeField]
     private string roomName;
+    [SerializeField]
+    private GameObject room;
+    [SerializeField]
+    private List<GameObject> objectsToSpawn;
 
-    XROrigin origin;
+    private Realtime _Realtime;
+    private Transform spawnTransform;
+    private InputDevice leftHandInput;
+
+    private void OnEnable()
+    {
+        leftHandInput = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+    }
 
     private void Start()
     {
-        origin = FindObjectOfType<XROrigin>();
         _Realtime = GetComponent<Realtime>();
 
-        //Connect to Preset Code
-        _Realtime.Connect(roomName);
-
         _Realtime.didConnectToRoom += _Realtime_didConnectToRoom;
+
+        _Realtime.didDisconnectFromRoom += _Realtime_didDisconnectFromRoom;
+
+        //Connect to Preset Code
+        //_Realtime.Connect(roomName);
     }
 
+    private void Update()
+    {
+        if (_Realtime.connected) return;
+
+        leftHandInput.TryGetFeatureValue(CommonUsages.menuButton, out bool menuPressed);
+        if (menuPressed)
+            _Realtime.Connect(roomName);
+    }
 
     //Realtime Event when Connecting to a Room
     private void _Realtime_didConnectToRoom(Realtime realtime)
     {
-        GameObject newPlayer = Realtime.Instantiate(playerPrefabName, origin.transform.position, origin.transform.rotation, new Realtime.InstantiateOptions
+        int id = _Realtime.clientID;
+
+        if (!spawnTransform)
+        {
+            Debug.Log("spawnTransform not set");
+            Debug.Log("Setting spawnTransform.....");
+            //if not then get from one of the default positions
+            spawnTransform = _localPlayer.transform;//either its current position
+
+            foreach (GameObject g in GameObject.FindGameObjectsWithTag("spawn"))
+            {
+                if (g.name.Equals(id.ToString()))
+                {
+                    spawnTransform = g.transform; break;
+                }
+            }
+            Debug.Log(".....spawnTransform set");
+        }
+
+        _localPlayer.transform.SetPositionAndRotation(spawnTransform.position, spawnTransform.rotation);
+
+        GameObject newPlayer = Realtime.Instantiate(playerPrefabName, spawnTransform.position, spawnTransform.rotation, new Realtime.InstantiateOptions
         {
             ownedByClient = true,
             preventOwnershipTakeover = true,
@@ -46,18 +89,31 @@ public class realtimeHelper : MonoBehaviour
             destroyWhenLastClientLeaves = true,
             useInstance = _Realtime,
         });
-        //RequestOwnerShip(newPlayer);
+        RequestOwnerShip(newPlayer);
+
+        if (id == 0)
+        {
+            AllRequestOwnerShip();
+        }
+    }
+
+    private void _Realtime_didDisconnectFromRoom(Realtime realtime)
+    {
+        AdditiveSceneLoader aSL = GetComponent<AdditiveSceneLoader>();
+
+        //take us back the lobby when we disconnect
+        aSL?.LoadScene(0);
     }
 
     private void RequestOwnerShip(GameObject o)
     {
-        if(o.TryGetComponent<RealtimeView>(out RealtimeView rtView))
+        if (o.TryGetComponent<RealtimeView>(out RealtimeView rtView))
             rtView.RequestOwnership();
 
         if (o.TryGetComponent<RealtimeTransform>(out RealtimeTransform rtTransform))
             rtTransform.RequestOwnership();
 
-        for(int c = 0; c < o.transform.childCount; c++)
+        for (int c = 0; c < o.transform.childCount; c++)
             RequestOwnerShip(o.transform.GetChild(c).gameObject);
 
         return;
@@ -65,18 +121,16 @@ public class realtimeHelper : MonoBehaviour
 
     private void AllRequestOwnerShip()
     {
-        var rViews = FindObjectsByType<RealtimeView>(FindObjectsSortMode.None);
-        var rTransforms = FindObjectsByType<RealtimeTransform>(FindObjectsSortMode.None);
+        var rViews = FindObjectsOfType<RealtimeView>();//GetComponents<RealtimeView>();//FindObjectsByType<RealtimeView>(FindObjectsSortMode.InstanceID);
+        var rTransforms = FindObjectsOfType<RealtimeTransform>();//GetComponents<RealtimeTransform>();//FindObjectsByType<RealtimeTransform>(FindObjectsSortMode.InstanceID);
 
         foreach (RealtimeView v in rViews)
         {
-            if(v.isUnownedSelf)
-                v.RequestOwnership();
+            v.RequestOwnership();
         }
-        foreach(RealtimeTransform t in rTransforms)
+        foreach (RealtimeTransform t in rTransforms)
         {
-            if (t.isUnownedSelf)
-                t.RequestOwnership();
+            t.RequestOwnership();
         }
     }
 
@@ -95,5 +149,68 @@ public class realtimeHelper : MonoBehaviour
         var finalString = new String(stringChars);
 
         return finalString;
+    }
+
+    public void JoinMainRoomByOffset(Transform offset)
+    {
+        spawnTransform = new GameObject().transform;
+
+        _Realtime.Connect(roomName);
+    }
+
+    public void JoinMainRoomByOffset(MyTransform offset)
+    {
+        spawnTransform = new GameObject().transform;
+
+        spawnTransform.position = new Vector3(_localPlayer.transform.position.x + offset.position.x,
+            _localPlayer.transform.position.y + offset.position.y,
+            _localPlayer.transform.position.z + offset.position.z);
+
+        spawnTransform.eulerAngles = new Vector3(_localPlayer.transform.eulerAngles.x + offset.eulerAngles.x,
+            _localPlayer.transform.eulerAngles.y + offset.eulerAngles.y,
+            _localPlayer.transform.eulerAngles.z + offset.eulerAngles.z);
+
+        Debug.Log("SpawnTransform: " + spawnTransform.position.ToString() + " " + spawnTransform.eulerAngles.ToString());
+
+        _Realtime.Connect(roomName);
+    }
+
+    public void JoinMainRoom(Transform transform)
+    {
+        spawnTransform = transform;
+        _Realtime.Connect(roomName);
+    }
+    
+    public void JoinMainRoom(MyTransform transform)
+    {
+        spawnTransform = new GameObject().transform;
+        spawnTransform.position = room.transform.position + transform.position;
+        spawnTransform.eulerAngles = transform.eulerAngles;
+        spawnTransform.RotateAround(room.transform.position, Vector3.up, -transform.rotAbt.y);
+        Debug.Log($"PlayerCenterReference {spawnTransform.transform.position.ToString()} Room {room.transform.position}");
+
+        _Realtime.Connect(roomName);
+    }
+
+    public void JoinMainRoom(Vector3 pos, Quaternion rot)
+    {
+        spawnTransform = new GameObject().transform;
+        //spawnTransform = transform;
+        spawnTransform.SetPositionAndRotation(pos, rot);
+        spawnTransform.localScale = Vector3.one;
+
+        JoinMainRoom(spawnTransform);
+    }
+
+    public void JoinLobby()
+    {
+
+    }
+
+    private void OnDisable()
+    {
+        _Realtime.didConnectToRoom -= _Realtime_didConnectToRoom;
+
+        _Realtime.didDisconnectFromRoom -= _Realtime_didDisconnectFromRoom;
     }
 }
